@@ -1,0 +1,5 @@
+{
+    "server": { "ip": "89.150.155.52", "port": 56556 },
+    "map_path": "maps/TheIsleMap_Jan2026.png",
+    "image_scale": 0.5
+}

@@ -1,0 +1,4 @@
+loggerric
+socketric
+pillow
+pyperclip
