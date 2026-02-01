@@ -4,6 +4,6 @@
         "path": "maps/TheIsleMap_Jan2026.png",
         "scale": 0.5
     },
-    "world_bounds": { "min_x": -480, "max_x": 550, "min_y": -600, "max_y": 550 },
+    "world_bounds": { "min_x": -480, "max_x": 605, "min_y": 500, "max_y": -575 },
     "trail": { "dot_size": 2, "line_size": 1 }
 }
