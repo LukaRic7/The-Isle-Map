@@ -18,7 +18,6 @@ def resource_path(relative_path: str) -> str:
     # Combine base path with relative path
     return os.path.join(base_path, relative_path)
 
-
 def translate_coords(coord: tuple[float, float], image_size: tuple[int, int], bounds: dict) -> tuple[int, int]:
     """
     Translates coordinates from a defined bounding box to pixel coordinates for
@@ -47,7 +46,6 @@ def translate_coords(coord: tuple[float, float], image_size: tuple[int, int], bo
 
     return int(px), int(py)
 
-
 def darken_hex_color(hex_color: str, percent: float = 0.3) -> str:
     """
     Darkens a hex color by a given percentage.
@@ -70,7 +68,6 @@ def darken_hex_color(hex_color: str, percent: float = 0.3) -> str:
 
     return f'#{r:02X}{g:02X}{b:02X}'
 
-
 def is_valid_coords(s: str) -> bool:
     """
     Validates if a string represents a proper coordinate list.
@@ -87,7 +84,6 @@ def is_valid_coords(s: str) -> bool:
         return True
     except ValueError:
         return False
-
 
 def parse_coords(coords: str) -> list[float]:
     """
