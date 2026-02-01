@@ -20,11 +20,12 @@ def resource_path(relative_path:str) -> str:
     return os.path.join(base_path, relative_path)
 
 # Get the exe path when compiled
-def get_exe_path() -> str:
+def get_exe_path(relative_path: str) -> str:
     """Get the folder where the exe or script is located."""
 
     if getattr(sys, 'frozen', False):
         # Compiled with PyInstaller
-        return os.path.dirname(sys.executable)
+        return os.path.join(os.path.dirname(sys.executable), relative_path)
 
-    return os.path.abspath('.') # Running as script
+    # Running as script
+    return os.path.join(os.path.abspath('.'), relative_path)
