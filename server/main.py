@@ -51,7 +51,12 @@ async def disconnect(sid:str):
     # Unassign colors and delete stored keys
     ColorManager.unassign(player_colors[sid])
     del player_colors[sid]
-    del player_coords[sid]
+    
+    # Execute in a try catch, might raise KeyError if the client never sent pos
+    try:
+        del player_coords[sid]
+    except KeyError:
+        pass
 
     lr.Log.info('Client disconnected:', sid)
 
