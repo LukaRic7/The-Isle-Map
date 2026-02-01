@@ -23,6 +23,8 @@ with open(utils.resource_path('config.json')) as file:
 @sio.event
 async def connect(sid:str, environ:dict, auth:dict):
     """Called when a client connects."""
+
+    # Check password
     if not auth or auth.get('password') != CONFIG.get('server').get('pass'):
         lr.Log.warn('Rejected client, incorrect password:', sid)
         return False # Reject
@@ -33,9 +35,12 @@ async def connect(sid:str, environ:dict, auth:dict):
 @sio.event
 async def disconnect(sid:str):
     """Called when a client disconnects."""
+
+    # Unassign colors and delete stored keys
     ColorManager.unassign(player_colors[sid])
     del player_colors[sid]
     del player_coords[sid]
+
     lr.Log.info('Client disconnected:', sid)
 
 # Called when a player updates their position
@@ -45,14 +50,22 @@ async def update_position(sid:str, coords:list):
     Called when a client updates their position, then tells all clients to
     update their positions so it's synced.
     """
+
+    # Append coord to player
     player_coords[sid].append(tuple(coords))
+
+    # Get the plain strcuture format for json
     plain = { player_colors[k]: list(v) for k, v in player_coords.items() }
+
+    # Broadcast positions to all clients
     await sio.emit('update-position', json.dumps(plain))
 
 # Called when a client yells back that they are connected
 @sio.on('client-connect')
 async def client_connect(sid:str, data):
     """Called when a client is connected. Assigns a unique color for them."""
+
+    # Assign a color and return it
     color = ColorManager.occupy()
     player_colors[sid] = color
     await sio.emit('color-assignment', color, sid)
