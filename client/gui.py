@@ -230,6 +230,7 @@ class Gui(ttk.Frame):
             self.connect_btn.configure(state='disabled')
             self.sio.disconnect()
             self.connect_btn.configure(state='enabled', text='Connect')
+            self.reset_btn.configure(state='enabled')
             self.set_color('#ff0000')
             self.__cb_reset()
             self.__clear_canvas()
@@ -244,6 +245,7 @@ class Gui(ttk.Frame):
                 )
                 # UI updates must run in main thread
                 self.connect_btn.after(0, lambda: self.connect_btn.configure(state='enabled', text='Disconnect'))
+                self.connect_btn.after(0, lambda: self.reset_btn.configure(state='disabled'))
             except Exception as e:
                 lr.Log.error('Error occurred on connection attempt:', e)
                 self.connect_btn.after(0, lambda: self.connect_btn.configure(state='enabled', text='Connect'))
