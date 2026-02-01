@@ -41,7 +41,7 @@ def translate_coords(coord: tuple[float, float], image_size: tuple[int, int], bo
     - `bounds` (dict): Dictionary with min/max bounds for x and y:
         {"min_x": float, "max_x": float, "min_y": float, "max_y": float}
     """
-    x, y = coord
+    y, x = coord
     w, h = image_size
 
     min_x = bounds['min_x']
