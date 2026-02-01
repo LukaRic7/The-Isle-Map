@@ -13,7 +13,7 @@ def resource_path(relative_path: str) -> str:
         base_path = sys._MEIPASS
     except AttributeError:
         # If running as a normal script
-        base_path = os.path.dirname(__file__)
+        base_path = os.path.abspath('.')
     
     # Combine base path with relative path
     return os.path.join(base_path, relative_path)
