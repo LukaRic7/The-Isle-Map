@@ -18,6 +18,16 @@ def resource_path(relative_path: str) -> str:
     # Combine base path with relative path
     return os.path.join(base_path, relative_path)
 
+# Get the exe path when compiled
+def get_exe_path() -> str:
+    """Get the folder where the exe or script is located."""
+
+    if getattr(sys, 'frozen', False):
+        # Compiled with PyInstaller
+        return os.path.dirname(sys.executable)
+
+    return os.path.abspath('.') # Running as script
+
 def translate_coords(coord: tuple[float, float], image_size: tuple[int, int], bounds: dict) -> tuple[int, int]:
     """
     Translates coordinates from a defined bounding box to pixel coordinates for

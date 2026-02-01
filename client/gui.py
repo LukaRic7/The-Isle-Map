@@ -41,7 +41,7 @@ class Gui(ttk.Frame):
         self.color = '#ff0000'
 
         # Load and scale map image
-        self.raw_image = Image.open(utils.resource_path(
+        self.raw_image = Image.open(utils.get_exe_path(
             self.config.get('map', {}).get('path')
         ))
         self.raw_image = self.raw_image.resize(
