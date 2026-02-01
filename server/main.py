@@ -39,7 +39,7 @@ async def disconnect(sid:str):
     lr.Log.info('Client disconnected:', sid)
 
 # Called when a player updates their position
-@sio.on("update-position")
+@sio.on('update-position')
 async def update_position(sid:str, coords:list):
     """
     Called when a client updates their position, then tells all clients to
@@ -50,7 +50,7 @@ async def update_position(sid:str, coords:list):
     await sio.emit('update-position', json.dumps(plain))
 
 # Called when a client yells back that they are connected
-@sio.on("client-connect")
+@sio.on('client-connect')
 async def client_connect(sid:str, data):
     """Called when a client is connected. Assigns a unique color for them."""
     color = ColorManager.occupy()
@@ -58,4 +58,4 @@ async def client_connect(sid:str, data):
     await sio.emit('color-assignment', color, sid)
 
 # Fire up the server to listen on all channels
-web.run_app(app, host="0.0.0.0", port=CONFIG.get('server').get('port'))
+web.run_app(app, host='0.0.0.0', port=CONFIG.get('server').get('port'))
