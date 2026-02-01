@@ -16,7 +16,7 @@ player_colors:dict = {}
 player_coords = defaultdict(lambda: deque(maxlen=10))
 
 # Read the config
-with open(utils.resource_path('config.json')) as file:
+with open(utils.get_exe_path('config.json')) as file:
     CONFIG:dict = json.load(file)
 
 # Bind client connect event
