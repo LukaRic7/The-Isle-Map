@@ -51,6 +51,7 @@ def serialize_player_information() -> dict:
             'growth': player_information.growth,
             'hunger': player_information.hunger,
             'thirst': player_information.thirst,
+            'coordinates': list(player_information.coordinates),
             'balance': player_information.balance
         }
     
