@@ -1,7 +1,7 @@
 from datetime import datetime
 from collections import deque
 from bs4 import BeautifulSoup
-import loggerric as lr
+#import loggerric as lr
 import requests, time
 
 class Client:
@@ -27,7 +27,7 @@ class Client:
         self.base_url = base_url
         self.headers  = { 'User-Agent': user_agent, 'Cookie': cookie }
 
-        lr.Log.info('Initialized fetching client!')
+        #lr.Log.info('Initialized fetching client!')
 
     def fetch(self, path:str='') -> BeautifulSoup:
         """
@@ -49,10 +49,10 @@ class Client:
 
         # URL did not return OK
         if not response.ok:
-            lr.Log.error('"{}" Failed! [{}]: {}'.format(url, status, reason))
+            #lr.Log.error('"{}" Failed! [{}]: {}'.format(url, status, reason))
             return
 
-        lr.Log.debug('"{}" Succeeded! [{}]: {}'.format(url, status, reason))
+        #lr.Log.debug('"{}" Succeeded! [{}]: {}'.format(url, status, reason))
 
         return BeautifulSoup(response.text, 'lxml')
 

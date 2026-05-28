@@ -3,7 +3,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from bs4 import BeautifulSoup
 from aiohttp import web
-import loggerric as lr
+#import loggerric as lr
 
 from colors import ColorManager
 from utils import get_exe_path, get_seconds_till_next_minute
@@ -68,19 +68,17 @@ async def connect(client_id:str, environment_values:dict, authentication:dict):
     """
     # Log connection
     ip = environment_values.get('REMOTE_ADDR')
-    lr.Log.debug(f'Connection attempt recieved from: {ip}', highlight=ip)
+    #lr.Log.debug(f'Connection attempt recieved from: {ip}', highlight=ip)
 
     # Check password
     auth = authentication or {}
     if auth.get('password') != CONFIG.get('password'):
-        lr.Log.warn(f'Rejected client, incorrect password: {client_id}',
-                    highlight=client_id)
+        #lr.Log.warn(f'Rejected client, incorrect password: {client_id}', highlight=client_id)
         raise ConnectionRefusedError('Incorrect password')
 
     # Assure non-duplicate
     if client_cache.get(client_id) != None:
-        lr.Log.warn(f'Rejected client, already connected: {client_id}',
-                    highlight=client_id)
+        #lr.Log.warn(f'Rejected client, already connected: {client_id}', highlight=client_id)
         raise ConnectionRefusedError('Already connected')
 
     # Create player
@@ -88,7 +86,8 @@ async def connect(client_id:str, environment_values:dict, authentication:dict):
     color = ColorManager.occupy()
     obs = Observer(auth.get('je-cookie'), user_agent=auth.get('user-agent')) if auth.get('je-cookie') else None
     if not obs:
-        lr.Log.warn('New client did not provide an observer!')
+        pass
+        #lr.Log.warn('New client did not provide an observer!')
 
     client_cache[client_id] = PlayerInformation(
         je_cookie=auth.get('je-cookie'), user_agent=auth.get('user-agent'),
@@ -100,8 +99,7 @@ async def connect(client_id:str, environment_values:dict, authentication:dict):
     positions = { cid: list(data.coordinates) for cid, data in client_cache.items() }
     await sio.emit('update-player-positions', positions, to=client_id)
 
-    lr.Log.info(f'Client connected with ID: {client_id}, Alias: "{alias}" and IP: {ip}',
-                highlight=[client_id, ip, alias])
+    #lr.Log.info(f'Client connected with ID: {client_id}, Alias: "{alias}" and IP: {ip}', highlight=[client_id, ip, alias])
 
 @sio.event
 async def disconnect(client_id:str):
@@ -114,7 +112,7 @@ async def disconnect(client_id:str):
     player:PlayerInformation = client_cache.get(client_id)
     # Check if player exists in cache
     if player == None:
-        lr.Log.warn(f'Non-connected client tried to disconnect: {client_id}', highlight=client_id)
+        #lr.Log.warn(f'Non-connected client tried to disconnect: {client_id}', highlight=client_id)
         raise ConnectionRefusedError('Not connected')
 
     # Unassign color
@@ -131,8 +129,7 @@ async def disconnect(client_id:str):
     positions = { cid: list(data.coordinates) for cid, data in client_cache.items() }
     await sio.emit('update-player-positions', positions)
 
-    lr.Log.info(f'Client "{alias}" disconnected with ID: {client_id}',
-                highlight=[client_id, alias])
+    #lr.Log.info(f'Client "{alias}" disconnected with ID: {client_id}', highlight=[client_id, alias])
 
 @sio.on('heartbeat')
 async def heartbeat(client_id:str) -> dict:
@@ -189,7 +186,8 @@ async def fetching_worker():
                         client_data.balance = data.get('balance')
                         client_data.species = data.get('dinosaur')
             except Exception as e:
-                lr.Log.error(f'Error occurred while fetching: {e}')
+                #lr.Log.error(f'Error occurred while fetching: {e}')
+                pass
 
         await sio.emit('update-player-list', serialize_player_information())
 
@@ -207,7 +205,7 @@ async def heartbeat_worker():
             try:
                 await sio.call('heartbeat', to=client_id, timeout=heartbeat_config.get('timeout_sec'))
             except (socketio.exceptions.TimeoutError, socketio.exceptions.BadNamespaceError):
-                lr.Log.warn(f"Heartbeat didn't reach client: {client_id}", highlight=client_id)
+                #lr.Log.warn(f"Heartbeat didn't reach client: {client_id}", highlight=client_id)
                 await sio.disconnect(client_id)
             
         await asyncio.sleep(heartbeat_config.get('interval_sec'))

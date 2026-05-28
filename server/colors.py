@@ -1,4 +1,4 @@
-import loggerric as lr
+#import loggerric as lr
 import random
 
 class ColorManager:
@@ -49,7 +49,7 @@ class ColorManager:
         # Mark the color as occupied
         ColorManager._assigned_colors.add(color)
 
-        lr.Log.debug(f'Occupying color: {color}')
+        #lr.Log.debug(f'Occupying color: {color}')
 
         return color
 
@@ -62,7 +62,7 @@ class ColorManager:
         - `color` (str): The color hex code to release.
         """
 
-        lr.Log.debug(f'Unassigning color: {color}')
+        #lr.Log.debug(f'Unassigning color: {color}')
         
         # discard avoids KeyError if color was not assigned
         ColorManager._assigned_colors.discard(color)
@@ -73,6 +73,6 @@ class ColorManager:
         Clears all assigned colors, making the entire pool available again.
         """
 
-        lr.Log.debug('Resetting available colors!')
+        #lr.Log.debug('Resetting available colors!')
         
         ColorManager._assigned_colors.clear()
