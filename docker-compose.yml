@@ -1,0 +1,14 @@
+version: "3.8"
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: the-isle-map-server:latest
+    ports:
+      - "56556:56556"
+    environment:
+      - PORT=56556
+    restart: unless-stopped
+    working_dir: /app/server
+    command: ["python", "main.py"]

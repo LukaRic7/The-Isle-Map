@@ -1,0 +1,13 @@
+# ignore everything by default
+*
+
+# allow server folder and its contents
+!server/
+!server/**
+
+# allow root requirements if used
+!requirements.txt
+
+# allow Dockerfile and docker-compose
+!Dockerfile
+!docker-compose.yml
