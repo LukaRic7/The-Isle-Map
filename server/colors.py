@@ -3,15 +3,18 @@ import random
 
 class ColorManager:
     """
-    Manages a fixed pool of colors, allowing them to be assigned and released.
+    **Manages a fixed pool of colors, allowing them to be assigned and released.**
+    
+    *Methods*:
+    - `occupy() -> str | None`: Assigns and returns a random free color from the available pool.
+    - `unassign(color) -> None`: Releases a previously occupied color, making it available again.
+    - `reset() -> None`: Clears all assigned colors, making the entire pool available again.
     """
 
     _available_colors = [
         "#F6C945",  # Gold
         "#F0672E",  # Orange
-        "#2ED1C5",  # Teal
         "#A75DF0",  # Purple
-        "#7BEB4F",  # Lime
         "#FF7ACD",  # Pink
         "#48C9FA",  # Cyan
         "#E63946",  # Red
@@ -23,7 +26,10 @@ class ColorManager:
     @staticmethod
     def occupy() -> str | None:
         """
-        Assigns and returns a random free color from the available pool.
+        **Assigns and returns a random free color from the available pool.**
+        
+        *Returns*:
+        - (str): The newly selected color.
         """
 
         # Build a list of colors that are not currently assigned

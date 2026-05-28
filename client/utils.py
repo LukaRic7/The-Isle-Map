@@ -1,13 +1,18 @@
 import os, sys
+from datetime import datetime
 
 # Relative path, compilation safe
-def resource_path(relative_path: str) -> str:
+def resource_path(relative_path:str) -> str:
     """
-    Returns the full path to a relative path. Compilation safe.
-
+    **Returns the full path to a relative path. Compilation safe.**
+    
     *Parameters*:
     - `relative_path` (str): The path from "." to the target.
+    
+    *Returns*:
+    - (str): The full path to the target.
     """
+
     try:
         # If running as a PyInstaller bundle
         base_path = sys._MEIPASS
@@ -19,8 +24,16 @@ def resource_path(relative_path: str) -> str:
     return os.path.join(base_path, relative_path)
 
 # Get the exe path when compiled
-def get_exe_path(relative_path: str) -> str:
-    """Get the folder where the exe or script is located."""
+def get_exe_path(relative_path:str) -> str:
+    """
+    **Get the folder where the exe or script is located.**
+    
+    *Parameters*:
+    - `relative_path` (str): The path from "." to the target.
+    
+    *Returns*:
+    - (str): The full path to the target.
+    """
 
     if getattr(sys, 'frozen', False):
         # Compiled with PyInstaller
@@ -29,10 +42,46 @@ def get_exe_path(relative_path: str) -> str:
     # Running as script
     return os.path.join(os.path.abspath('.'), relative_path)
 
-def translate_coords(coord: tuple[float, float], image_size: tuple[int, int], bounds: dict) -> tuple[int, int]:
+def darken_hex_color(hex_color: str, percent: float = 0.3) -> str:
     """
-    Translates coordinates from a defined bounding box to pixel coordinates for
-    an image.
+    Darkens a hex color by a given percentage.
+
+    *Parameters*:
+    - `hex_color` (str): Hexadecimal color string, e.g., "#FFAA00".
+    - `percent` (float): Fraction to darken the color by (default 0.3 = 30%).
+
+    *Returns*:
+    - (str): The darkened hex color.
+    """
+    hex_color = hex_color.lstrip('#')
+
+    # Convert hex to RGB components
+    r = int(hex_color[0:2], 16)
+    g = int(hex_color[2:4], 16)
+    b = int(hex_color[4:6], 16)
+
+    # Apply darkening factor and clamp to [0, 255]
+    r = max(0, min(255, int(r * (1 - percent))))
+    g = max(0, min(255, int(g * (1 - percent))))
+    b = max(0, min(255, int(b * (1 - percent))))
+
+    return f'#{r:02X}{g:02X}{b:02X}'
+
+def get_seconds_till_next_minute() -> int:
+    """
+    **Get the amount of seconds to the next minute hits.**
+    
+    *Returns*:
+    - (int): The amount of seconds until the next minute hits.
+    """
+
+    now = datetime.now()
+    return 60 - now.second
+
+def translate_coords(coord:tuple[float, float], image_size:tuple[int, int], bounds:dict) -> tuple[int, int]:
+    """
+    **Translates coordinates from a defined bounding box to pixel coordinates for
+    an image.**
 
     *Parameters*:
     - `coord` (tuple[float, float]): The original (x, y) coordinates to
@@ -40,6 +89,9 @@ def translate_coords(coord: tuple[float, float], image_size: tuple[int, int], bo
     - `image_size` (tuple[int, int]): Width and height of the target image.
     - `bounds` (dict): Dictionary with min/max bounds for x and y:
         {"min_x": float, "max_x": float, "min_y": float, "max_y": float}
+
+    *Returns*:
+    - (tuple[int, int]): The translated x,y on the image.
     """
     y, x = coord
     w, h = image_size
@@ -57,36 +109,17 @@ def translate_coords(coord: tuple[float, float], image_size: tuple[int, int], bo
 
     return int(px), int(py)
 
-def darken_hex_color(hex_color: str, percent: float = 0.3) -> str:
-    """
-    Darkens a hex color by a given percentage.
-
-    *Parameters*:
-    - `hex_color` (str): Hexadecimal color string, e.g., "#FFAA00".
-    - `percent` (float): Fraction to darken the color by (default 0.3 = 30%).
-    """
-    hex_color = hex_color.lstrip('#')
-
-    # Convert hex to RGB components
-    r = int(hex_color[0:2], 16)
-    g = int(hex_color[2:4], 16)
-    b = int(hex_color[4:6], 16)
-
-    # Apply darkening factor and clamp to [0, 255]
-    r = max(0, min(255, int(r * (1 - percent))))
-    g = max(0, min(255, int(g * (1 - percent))))
-    b = max(0, min(255, int(b * (1 - percent))))
-
-    return f'#{r:02X}{g:02X}{b:02X}'
-
-def is_valid_coords(s: str) -> bool:
+def is_valid_coords(coordinates:str) -> bool:
     """
     Validates if a string represents a proper coordinate list.
 
     *Parameters*:
-    - `s` (str): Input string containing coordinates.
+    - `coordinates` (str): Input string containing coordinates.
+
+    *Returns*:
+    - (bool): True if the coords are valid.
     """
-    s = s.replace(' ', '')
+    s = coordinates.replace(' ', '')
     if s.count(',') != 5:  # Must have 5 commas => 6 values
         return False
     try:
@@ -96,15 +129,18 @@ def is_valid_coords(s: str) -> bool:
     except ValueError:
         return False
 
-def parse_coords(coords: str) -> list[float]:
+def parse_coords(coordinates:str) -> list[float]:
     """
     Parses every other number from a comma-separated coordinate string.
 
     *Parameters*:
-    - `coords` (str): Comma-separated string of coordinates.
+    - `coordinates` (str): Comma-separated string of coordinates.
+
+    *Returns*:
+    - (list[float]): List of the parsed coords [x, z]
     """
     parsed_coords = []
-    for index, segment in enumerate(coords.split(',')):
+    for index, segment in enumerate(coordinates.split(',')):
         if index % 2 != 0:  # Skip every odd index (y-coordinates)
             continue
         parsed_coords.append(float(segment))

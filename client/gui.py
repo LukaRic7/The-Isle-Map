@@ -1,328 +1,490 @@
-import pyperclip, json, socketio, threading
+import pyperclip, json, socketio, threading, math, time
+from datetime import datetime, timezone, timedelta
 from PIL import Image, ImageDraw, ImageTk
+from dataclasses import dataclass, field
 from collections import deque
 from tkinter import ttk
 import loggerric as lr
 import tkinter as tk
 
-import utils
+from utils import get_exe_path, get_seconds_till_next_minute, darken_hex_color, translate_coords
+from fetch import Observer
+
+@dataclass
+class PlayerInformation:
+    je_cookie:str=None
+    color:str=None
+    coordinates:deque[dict]=field(default_factory=lambda: deque(maxlen=5)) # [{ 'utc_timestamp': 0, 'coordinates': '...' }, ...]
+    species:str=None
+    health:dict=field(default_factory=dict) # { 'percent': 0, 'deltarate': 0, 'eta_top': -0 }
+    growth:dict=field(default_factory=dict) # { -||- }
+    hunger:dict=field(default_factory=dict) # { -||- }
+    thirst:dict=field(default_factory=dict) # { -||- }
+    balance:int=None
+    alias:str='No Username'
 
 class Gui(ttk.Frame):
-    """
-    GUI class for displaying and tracking player positions on a map.
-
-    This class integrates clipboard monitoring, offline and online tracking,
-    drawing trails on a map image, and server connection using Socket.IO.
-
-    *Parameters*:
-    - `root` (tk.Tk): The main Tkinter window.
-    - `sio` (socketio.Client): Socket.IO client instance.
-    - `config` (dict): Configuration dictionary with keys:
-        - "map": {"path": str, "scale": float}
-        - "world_bounds": {"min_x": float, "max_x": float, "min_y": float, "max_y": float}
-        - "trail": {"dot_size": int}
-        - "server": {"ip": str, "port": int, "pass": str}
-    """
-    def __init__(self, root: tk.Tk, sio: socketio.Client, config: dict):
+    def __init__(self, root:tk.Tk, sio:socketio.Client, config:dict):
         super().__init__(root)
 
         self.root = root
         self.sio = sio
         self.config = config
+        self.je_fetcher = Observer(self.config.get('je_cookie'), self.config.get('user_agent'))
 
-        # Last clipboard value
-        self.last_clip: str = None
-        # Label showing current player color
-        self.identifier_label: ttk.Label = None
+        self.raw_image = Image.open(get_exe_path(self.config.get('map', {}).get('path')))
+        self.render_image = None
+        self.tk_image:ImageTk.PhotoImage = None
 
-        # Queue of offline coordinates (max 10 points)
-        self.offline_positions: deque[tuple] = deque(maxlen=10)
-        # Default player color
-        self.color = '#ff0000'
+        self._render_job = None
+        self._rendering = False
+        self.canvas_image_id = None
 
-        # Load and scale map image
-        self.raw_image = Image.open(utils.get_exe_path(
-            self.config.get('map', {}).get('path')
-        ))
-        self.raw_image = self.raw_image.resize(
-            tuple([
-                round(size * self.config.get('map', {}).get('scale'))
-                for size in self.raw_image.size
-            ])
+        self.player_list:dict = {}
+        self.player_list_widgets:dict = {}
+        self.offline_stats = PlayerInformation(
+            je_cookie=config.get('je_cookie'), color='#ff0000',
+            alias=config.get('online', {}).get('alias', 'No Username')
         )
+        self.online_mode = False
+        self.je_thread:threading.Thread = None
 
-        # Draw chess-style grid overlay on map
-        self.__draw_chess_grid()
+        self.kill_threads = False
+        root.protocol("WM_DELETE_WINDOW", self.__on_close)
 
-        # Copy of the image for drawing trails
-        self.image = self.raw_image.copy()
-        self.draw = ImageDraw.Draw(self.image)
-
-        # Add all widgets to GUI
         self.__add_widgets()
+
+    def __on_close(self):
+        self.kill_threads = True
+
+    def __render_scaled_image(self, target_width:int, target_height:int):
+        base = self.raw_image
+
+        bw, bh = base.size
+        scale = min(target_width / bw, target_height / bh)
+
+        new_size = (int(bw * scale), int(bh * scale))
+        resized = base.resize(new_size, Image.Resampling.LANCZOS).convert('RGBA')
+
+        canvas = Image.new('RGBA', (target_width, target_height), self.config.get('map').get('letterboxing_color'))
+
+        offset_x = (target_width - new_size[0]) // 2
+        offset_y = (target_height - new_size[1]) // 2
+
+        canvas.paste(resized, (offset_x, offset_y))
+
+        chess_overlay = Image.new('RGBA', (target_width, target_height), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(chess_overlay)
+
+        # Player coords
+        self.update()
+        print('__render_scaled_image', self.online_mode, self.sio.connected)
+        if self.online_mode and self.sio.connected:
+            for client_id, player_data in self.player_list.items():
+                if not player_data: continue
+
+                translated_points = []
+                base_color = player_data.get('color')
+                for data in player_data.get('coordinates', []):
+                    coords = data.get('coordinates')
+                    if coords:
+                        mx, my = translate_coords(coords, new_size, self.config.get('map', {}).get('world_bounds'))
+                        x = offset_x + mx
+                        y = offset_y + my
+                        translated_points.append((x, y))
+
+                initial_size = self.canvas_frame.winfo_width()
+
+                if len(translated_points) > 1:
+                    line_color = darken_hex_color(base_color, 0.4)
+                    for i in range(len(translated_points) - 1):
+                        draw.line((translated_points[i], translated_points[i + 1]), fill=line_color, width=int(initial_size * 0.005))
+
+                for i, (x, y) in enumerate(translated_points):
+                    if i == len(translated_points) - 1:
+                        radius = int(initial_size * 0.01)
+                        draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=base_color, outline="#ffffff", width=1)
+                    else:
+                        radius = int(initial_size * 0.005)
+                        try:
+                            history_dot_color = darken_hex_color(base_color, 0.2)
+                        except Exception:
+                            history_dot_color = base_color
+                            
+                        draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=history_dot_color, outline=None)
+        else:
+            translated_points = []
+            base_color = self.offline_stats.color
+            for data in self.offline_stats.coordinates:
+                coords = data.get('coordinates')
+                if coords:
+                    mx, my = translate_coords(coords, new_size, self.config.get('map', {}).get('world_bounds'))
+                    x = offset_x + mx
+                    y = offset_y + my
+                    translated_points.append((x, y))
+
+            initial_size = self.canvas_frame.winfo_width()
+
+            if len(translated_points) > 1:
+                line_color = darken_hex_color(base_color, 0.4)
+                for i in range(len(translated_points) - 1):
+                    draw.line((translated_points[i], translated_points[i + 1]), fill=line_color, width=int(initial_size * 0.005))
+
+            for i, (x, y) in enumerate(translated_points):
+                if i == len(translated_points) - 1:
+                    radius = int(initial_size * 0.01)
+                    draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=base_color, outline="#ffffff", width=1)
+                else:
+                    radius = int(initial_size * 0.005)
+                    try:
+                        history_dot_color = darken_hex_color(base_color, 0.2)
+                    except Exception:
+                        history_dot_color = base_color
+                        
+                    draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=history_dot_color, outline=None)
+
+        # Chess grid
+        cols = 8
+        rows = 8
+        cell_w = new_size[0] / cols
+        cell_h = new_size[1] / rows
+
+        line_color = (255, 255, 255, 128)
+
+        for c in range(cols + 1):
+            x = offset_x + (c * cell_w)
+            draw.line((x, offset_y, x, offset_y + new_size[1]), fill=line_color, width=1)
+
+        for r in range(rows + 1):
+            y = offset_y + (r * cell_h)
+            draw.line((offset_x, y, offset_x + new_size[0], y), fill=line_color, width=1)
+
+        letters = 'ABCDEFGH'
+
+        for c in range(cols):
+            x = offset_x + (c * cell_w) + 15
+            y = offset_y + 5
+            draw.text((x, y), letters[c], fill=line_color)
+
+        for r in range(rows):
+            x = offset_x + 5
+            y = offset_y + (r * cell_h) + 15
+            draw.text((x, y), str(r + 1), fill=line_color)
+
+        final_canvas = Image.alpha_composite(canvas, chess_overlay)
+
+        return final_canvas, scale, (offset_x, offset_y)
+
+    def render_map(self):
+        if self._rendering: return
+        self._rendering = True
+
+        w = self.canvas_frame.winfo_width()
+        h = self.canvas_frame.winfo_height()
+
+        if w < 50 or h < 50:
+            self._rendering = False
+            return
+
+        rendered, scale, offset = self.__render_scaled_image(w, h)
+
+        self.canvas.delete('all')
+
+        self.tk_image = ImageTk.PhotoImage(rendered)
+        self.canvas_image_id = self.canvas.create_image(0, 0, anchor='nw', image=self.tk_image)
+
+        self._rendering = False
+
+    def __schedule_render(self, event=None):
+        if self._render_job is not None:
+            self.after_cancel(self._render_job)
+        
+        self._render_job = self.after(10, self.render_map)
+
+    def redraw_player_list(self):
+        for _ in range(60):
+            self.update() # Give time for the variables to update
+        print('redraw_player_list', self.online_mode, self.sio.connected)
     
-        # Start periodic clipboard monitoring
-        self.root.after(500, self.__check_clipboard)
+        if self.online_mode and self.sio.connected:
+            self.player_list_widgets['OFFLINE'] = None
 
-    def set_color(self, color: str) -> None:
-        """
-        Sets the player's color and updates the identifier label.
+            for child in self.player_frame.winfo_children():
+                child.destroy()
+            self.player_list_widgets.clear()
 
-        *Parameters*:
-        - `color` (str): Hex color string, e.g., "#FF0000"
-        """
-
-        self.identifier_label.configure(foreground=color)
-        self.color = color
-
-    def __check_clipboard(self) -> None:
-        """
-        Periodically checks the clipboard for new coordinates.
-
-        If valid coordinates are detected, they are added to offline positions
-        and sent to the server if connected.
-        """
-
-        try:
-            clip = pyperclip.paste().strip()
-        except Exception:
-            clip = ''
-
-        # Only process if clipboard changed and contains valid coordinates
-        if clip != self.last_clip and utils.is_valid_coords(clip):
-            coords = utils.parse_coords(clip)[0:2]
-
-            # Add to offline positions
-            self.offline_positions.append(coords)
-            
-            self.last_clip = clip
-
-            # Update local trail display
-            self.update_positions_offline()
-
-            # Emit update to server if connected
-            if self.sio.connected:
-                self.sio.emit('update-position', coords)
-        
-        # Repeat every 500ms
-        self.root.after(500, self.__check_clipboard)
-
-    def update_positions_online(self, players_positions: str) -> None:
-        """
-        Updates the map with online players' positions.
-
-        Draws trails for each player with faded lines connecting points.
-
-        *Parameters*:
-        - `players_positions` (str): JSON string mapping colors to coordinate
-        lists.
-        """
-
-        self.__clear_canvas()
-
-        players_positions = json.loads(players_positions)
-
-        for color, positions in players_positions.items():
-            last_point: tuple[float] = None
-            for coord in positions:
-                # Translate world coordinates to image pixels
-                x, y = utils.translate_coords(
-                    coord,
-                    self.raw_image.size,
-                    self.config.get('world_bounds')
-                )
-
-                # Draw connecting line to previous point
-                if last_point:
-                    self.draw.line(
-                        (last_point, (x, y)),
-                        fill=utils.darken_hex_color(color, 0.3)
-                    )
+            for index, (client_id, client_data) in enumerate(self.player_list.copy().items()):
+                if self.player_list_widgets.get(client_id) == None:
+                    self.player_list_widgets[client_id] = {}
                 
-                # Draw dot at current point
-                dot_size = self.config.get('trail').get('dot_size')
-                self.draw.ellipse(
-                    (x - dot_size, y - dot_size, x + dot_size, y + dot_size),
-                    fill=color,
-                    outline='black'
-                )
+                    label_frame = ttk.Labelframe(self.player_frame, text=client_data.get('alias'))
+                    label_frame.grid(row=index, column=0, padx=10, pady=10, sticky='new')
 
-                last_point = (x, y)
+                    stats_frame = ttk.Frame(label_frame)
+                    stats_frame.grid(row=1, column=0, padx=10, pady=10, sticky='nsew')
 
-        self.update_display()
+                    color_bar = ttk.Label(label_frame, font=('Seoge UI', 3), background=client_data.get('color'))
+                    color_bar.grid(row=0, column=0, columnspan=2, padx=10, pady=(10, 0), sticky='nsew')
 
-    def update_positions_offline(self) -> None:
-        """
-        Updates the map with offline player positions.
+                    for index, stat in enumerate(['health', 'growth', 'hunger', 'thirst']):
+                        color = { 'health': '#cc3d3d', 'growth': '#5fbf00', 'hunger': '#cc8400', 'thirst': '#00b3b3' }[stat]
 
-        Draws trails from the `offline_positions` deque.
-        """
+                        title = ttk.Label(stats_frame, text=f'{stat.title()}:', foreground=color)
+                        title.grid(row=index, column=0, padx=10, sticky='nsew')
 
-        self.__clear_canvas()
+                        percent = ttk.Label(stats_frame, text='-%', foreground=color)
+                        percent.grid(row=index, column=1, padx=10, sticky='nsew')
 
-        last_point: tuple[float] = None
-        for coord in self.offline_positions:
-            # Translate world coordinates to image pixels
-            x, y = utils.translate_coords(
-                coord,
-                self.raw_image.size,
-                self.config.get('world_bounds')
-            )
+                        change = ttk.Label(stats_frame, text='0.00%/m', foreground=color)
+                        change.grid(row=index, column=2, padx=10, sticky='nsew')
 
-            # Draw connecting line
-            if last_point:
-                self.draw.line(
-                    (last_point, (x, y)),
-                    fill=utils.darken_hex_color(self.color, 0.3)
-                )
+                        eta = ttk.Label(stats_frame, text='0 min', foreground=color)
+                        eta.grid(row=index, column=3, padx=10, sticky='nsew')
+
+                        self.player_list_widgets[client_id][stat] = {
+                            'percent': percent, 'change': change, 'eta': eta
+                        }
+
+                    insight_frame = ttk.Frame(label_frame)
+                    insight_frame.grid(row=1, column=1, padx=10, pady=10, sticky='nsew')
+
+                    last_position = ttk.Label(insight_frame, anchor='center', justify='center', text='Last position:\n- minutes ago')
+                    last_position.grid(row=0, column=0, padx=10, sticky='nsew')
+                    
+                    balance = ttk.Label(insight_frame, anchor='center', justify='center', text=f'Balance:\n$-')
+                    balance.grid(row=1, column=0, padx=10, pady=(10, 0), sticky='nsew')
+
+                    self.player_list_widgets[client_id]['label_frame'] = label_frame
+                    self.player_list_widgets[client_id]['balance'] = balance
+                    self.player_list_widgets[client_id]['last_position'] = last_position
+
+                self.player_list_widgets[client_id]['balance'].configure(text=f'Balance:\n${client_data.get("balance") or 0}')
+
+                self.player_list_widgets[client_id]['label_frame'].configure(text=f'{client_data.get("alias")} - {client_data.get("species")}')
+
+                now_utc_ts = int(datetime.now(tz=timezone.utc).timestamp())
+                if len(client_data.get('coordinates') or []) > 0:
+                    last_pos_ts = client_data['coordinates'][-1]
+                    minutes_ago = math.floor((now_utc_ts - last_pos_ts['utc_timestamp']) / 60)
+                    self.player_list_widgets[client_id]['last_position'].configure(text=f'Last position:\n{minutes_ago} minutes ago')
+                
+                for index, (key, stat) in enumerate([
+                    ('health', client_data['health']), ('growth', client_data['growth']),
+                    ('hunger', client_data['hunger']), ('thirst', client_data['thirst'])]):
+                    self.player_list_widgets[client_id][key]['percent'].configure(text=f"{(stat.get('percent', 0) or 0) * 100:.0f}%")
+                    self.player_list_widgets[client_id][key]['change'].configure(text=f"{stat.get('deltarate', 0) or 0:.2f}%/m")
+                    self.player_list_widgets[client_id][key]['eta'].configure(text=f"{stat.get('eta_top', 0) or 0:.0f} min")
+        else:
+            if self.player_list_widgets.get('OFFLINE') == None:
+                self.player_list_widgets['OFFLINE'] = {}
+
+                label_frame = ttk.Labelframe(self.player_frame, text=self.offline_stats.alias)
+                label_frame.grid(row=0, column=0, padx=10, pady=10, sticky='new')
+
+                stats_frame = ttk.Frame(label_frame)
+                stats_frame.grid(row=1, column=0, padx=10, pady=10, sticky='nsew')
+
+                color_bar = ttk.Label(label_frame, font=('Seoge UI', 3), background='#ff0000')
+                color_bar.grid(row=0, column=0, columnspan=2, padx=10, pady=(10, 0), sticky='nsew')
+
+                for index, stat in enumerate(['health', 'growth', 'hunger', 'thirst']):
+                    color = { 'health': '#cc3d3d', 'growth': '#5fbf00', 'hunger': '#cc8400', 'thirst': '#00b3b3' }[stat]
+
+                    title = ttk.Label(stats_frame, text=f'{stat.title()}:', foreground=color)
+                    title.grid(row=index, column=0, padx=10, sticky='nsew')
+
+                    percent = ttk.Label(stats_frame, text='-%', foreground=color)
+                    percent.grid(row=index, column=1, padx=10, sticky='nsew')
+
+                    change = ttk.Label(stats_frame, text='0.00%/m', foreground=color)
+                    change.grid(row=index, column=2, padx=10, sticky='nsew')
+
+                    eta = ttk.Label(stats_frame, text='0 min', foreground=color)
+                    eta.grid(row=index, column=3, padx=10, sticky='nsew')
+
+                    self.player_list_widgets['OFFLINE'][stat] = {
+                        'percent': percent, 'change': change, 'eta': eta
+                    }
+
+                insight_frame = ttk.Frame(label_frame)
+                insight_frame.grid(row=1, column=1, padx=10, pady=10, sticky='nsew')
+
+                last_position = ttk.Label(insight_frame, anchor='center', justify='center', text='Last position:\n- minutes ago')
+                last_position.grid(row=0, column=0, padx=10, sticky='nsew')
+                
+                balance = ttk.Label(insight_frame, anchor='center', justify='center', text=f'Balance:\n$-')
+                balance.grid(row=1, column=0, padx=10, pady=(10, 0), sticky='nsew')
+
+                self.player_list_widgets['OFFLINE']['label_frame'] = label_frame
+                self.player_list_widgets['OFFLINE']['balance'] = balance
+                self.player_list_widgets['OFFLINE']['last_position'] = last_position
             
-            # Draw dot at current point
-            dot_size = self.config.get('trail').get('dot_size')
-            self.draw.ellipse(
-                (x - dot_size, y - dot_size, x + dot_size, y + dot_size),
-                fill=self.color,
-                outline='black'
-            )
+            self.player_list_widgets['OFFLINE']['balance'].configure(text=f'Balance:\n${self.offline_stats.balance}')
 
-            last_point = (x, y)
+            self.player_list_widgets['OFFLINE']['label_frame'].configure(text=f'{self.offline_stats.alias} - {self.offline_stats.species}')
+
+            now_utc_ts = int(datetime.now(tz=timezone.utc).timestamp())
+            if len(self.offline_stats.coordinates) > 0:
+                last_pos_ts = self.offline_stats.coordinates[-1]
+                minutes_ago = math.floor((now_utc_ts - last_pos_ts['utc_timestamp']) / 60)
+                self.player_list_widgets['OFFLINE']['last_position'].configure(text=f'Last position:\n{minutes_ago} minutes ago')
+            
+            for index, (key, stat) in enumerate([
+                ('health', self.offline_stats.health), ('growth', self.offline_stats.growth),
+                ('hunger', self.offline_stats.hunger), ('thirst', self.offline_stats.thirst)]):
+                self.player_list_widgets['OFFLINE'][key]['percent'].configure(text=f"{(stat.get('percent', 0) or 0) * 100:.0f}%")
+                self.player_list_widgets['OFFLINE'][key]['change'].configure(text=f"{stat.get('deltarate', 0) or 0:.2f}%/m")
+                self.player_list_widgets['OFFLINE'][key]['eta'].configure(text=f"{stat.get('eta_top', 0) or 0:.0f} min")
+            
+    def on_new_local_coords(self, coords:tuple[float, float]):
+        lr.Log.debug(f'New coordinates detected: {coords}', highlight=coords)
+
+        if self.online_mode:
+            self.sio.emit('position-update', (coords, int(datetime.now(tz=timezone.utc).timestamp())))
+        else:
+            self.offline_stats.coordinates.append({
+                'utc_timestamp': int(datetime.now(tz=timezone.utc).timestamp()),
+                'coordinates': coords
+            })
+
+        self.root.after(0, self.render_map)
+        self.root.after(0, self.redraw_player_list)
+
+    def je_worker(self):
+        lr.Log.debug('JE Worker started!')
+        while not self.online_mode and not self.kill_threads:
+            data = self.je_fetcher.fetch()
+            if data:
+                self.offline_stats.health = {
+                    'percent': data.get('current').get('Health'),
+                    'deltarate': data.get('delta-per-min', {}).get('Health'),
+                    'eta_top': data.get('est-time-min', {}).get('Health')
+                }
+                self.offline_stats.growth = {
+                    'percent': data.get('current').get('Growth'),
+                    'deltarate': data.get('delta-per-min', {}).get('Growth'),
+                    'eta_top': data.get('est-time-min', {}).get('Growth')
+                }
+                self.offline_stats.hunger = {
+                    'percent': data.get('current').get('Hunger'),
+                    'deltarate': data.get('delta-per-min', {}).get('Hunger'),
+                    'eta_top': data.get('est-time-min', {}).get('Hunger')
+                }
+                self.offline_stats.thirst = {
+                    'percent': data.get('current').get('Thirst'),
+                    'deltarate': data.get('delta-per-min', {}).get('Thirst'),
+                    'eta_top': data.get('est-time-min', {}).get('Thirst')
+                }
+                self.offline_stats.balance = data.get('balance')
+                self.offline_stats.species = data.get('dinosaur')
+
+            self.root.after(0, self.redraw_player_list)
+
+            time.sleep(get_seconds_till_next_minute())
         
-        self.update_display()
+        lr.Log.debug('JE Worker killed!')
 
-    def update_display(self) -> None:
+    def update_countdown(self):
+        self.je_countdown.configure(text=f'Updating stats in:\n{get_seconds_till_next_minute()} seconds')
+
+        self.root.after(1000, self.update_countdown)
+
+    def reset_map(self):
+        self.offline_stats.coordinates = []
+
+        self.root.after(0, self.render_map)
+
+    def heartbeat_worker(self):
         """
-        Updates the Tkinter label with the current image.
-
-        Converts PIL image to ImageTk format and prevents garbage collection.
+        **Called by a thread. Sends heartbeats to the server.**
         """
+        while not self.kill_threads and self.sio.connected:
+            try:
+                self.sio.call('heartbeat', timeout=2)
+            except (socketio.exceptions.TimeoutError, socketio.exceptions.BadNamespaceError):
+                lr.Log.warn("Heartbeat didn't reach server!")
 
-        self.tk_image = ImageTk.PhotoImage(self.image)
-        self.image_label.configure(image=self.tk_image)
-        self.image_label.image = self.tk_image  # Prevent GC
+            time.sleep(5)
 
-        self.update_idletasks()
-
-    def __cb_reset(self) -> None:
-        """
-        Callback for the 'Reset Map' button.
-
-        Clears offline positions, clipboard, and redraws the map.
-        """
-
-        self.offline_positions = []
-        
-        self.last_clip = ''
-        pyperclip.copy('')
-
-        self.__clear_canvas()
-
-    def __cb_connect(self) -> None:
-        """
-        Callback for the 'Connect' button.
-
-        Handles connection/disconnection to the Socket.IO server in a separate
-        thread to avoid freezing the UI.
-        """
-
-        s_config = self.config.get('server')
-        
+    def __connect(self):
         if self.sio.connected:
-            # Disconnect if already connected
             self.connect_btn.configure(state='disabled')
             self.sio.disconnect()
             self.connect_btn.configure(state='enabled', text='Connect')
-            self.reset_btn.configure(state='enabled')
-            self.set_color('#ff0000')
-            self.__cb_reset()
-            self.__clear_canvas()
-            return
+            self.reset_map_btn.configure(state='enabled')
 
-        # Function to run in a separate thread for connection
+            for child in self.player_frame.winfo_children():
+                child.destroy()
+
+            self.reset_map()
+            self.redraw_player_list()
+            self.online_mode = False
+            return
+        
         def connect_thread():
             try:
-                self.sio.connect(
-                    f"http://{s_config.get('ip')}:{s_config.get('port')}",
-                    auth={'password': s_config.get('pass')}
-                )
+                oc:dict = self.config.get('online')
+                self.sio.connect(f'http://{oc.get("ip")}:{oc.get("port")}', auth={
+                    'password': oc.get('password'), 'je-cookie': self.config.get('je_cookie'),
+                    'alias': oc.get('alias'), 'user-agent': self.config.get('user_agent')
+                })
+
                 # UI updates must run in main thread
+                self.online_mode = True
                 self.connect_btn.after(0, lambda: self.connect_btn.configure(state='enabled', text='Disconnect'))
-                self.connect_btn.after(0, lambda: self.reset_btn.configure(state='disabled'))
+                self.connect_btn.after(0, lambda: self.reset_map_btn.configure(state='disabled'))
+
+                for child in self.player_frame.winfo_children():
+                    child.destroy()
+
+                threading.Thread(target=self.heartbeat_worker, daemon=True).start()
             except Exception as e:
                 lr.Log.error('Error occurred on connection attempt:', e)
                 self.connect_btn.after(0, lambda: self.connect_btn.configure(state='enabled', text='Connect'))
 
-        # Disable button immediately in main thread
         self.connect_btn.configure(state='disabled', text='Connecting')
-        
-        # Start connection in a new thread
+
         threading.Thread(target=connect_thread, daemon=True).start()
-        
-        # Reset offline data and canvas
-        self.__cb_reset()
-        self.__clear_canvas()
 
-    def __clear_canvas(self) -> None:
-        """Clears all drawings on the map and restores the original image."""
+        self.reset_map()
 
-        self.image = self.raw_image.copy()
-        self.draw = ImageDraw.Draw(self.image)
+    def __add_widgets(self):
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
 
-        self.update_display()
+        self.canvas_frame = ttk.Frame(self)
+        self.canvas_frame.grid(row=0, column=0, sticky='nsew')
+        self.canvas_frame.grid_rowconfigure(0, weight=1)
+        self.canvas_frame.grid_columnconfigure(0, weight=1)
 
-    def __add_widgets(self) -> None:
-        """
-        Adds all GUI widgets (buttons, labels, image display) to the frame.
-        """
+        self.canvas = tk.Canvas(self.canvas_frame, highlightthickness=0)
+        self.canvas.grid(row=0, column=0, sticky='nsew')
 
-        self.connect_btn = ttk.Button(self, text='Connect', width=20, command=self.__cb_connect)
-        self.connect_btn.grid(row=0, column=0, padx=5, pady=5)
+        self.canvas.bind('<Configure>', self.__schedule_render)
 
-        self.identifier_label = ttk.Label(
-            self, text='YOU', foreground='#ff0000', font=('Seoge UI', 12, 'bold')
-        )
-        self.identifier_label.grid(row=0, column=1, padx=5, pady=5)
+        self.sidebar_frame = ttk.Frame(self)
+        self.sidebar_frame.grid(row=0, column=1, sticky='nsew')
+        self.sidebar_frame.grid_rowconfigure(2, weight=1)
+        self.sidebar_frame.grid_columnconfigure([0, 2], weight=1)
 
-        self.reset_btn = ttk.Button(self, text='Reset Map', width=20, command=self.__cb_reset)
-        self.reset_btn.grid(row=0, column=2, padx=5, pady=5)
+        self.connect_btn = ttk.Button(self.sidebar_frame, width=20, text='Connect', command=self.__connect)
+        self.connect_btn.grid(row=0, column=0, padx=10, pady=10, sticky='nsew')
 
-        # Initial map display
-        self.tk_image = ImageTk.PhotoImage(self.image)
-        self.image_label = ttk.Label(self, image=self.tk_image)
-        self.image_label.grid(row=1, column=0, columnspan=3)
+        self.je_countdown = ttk.Label(self.sidebar_frame, anchor='center', justify='center', text='Updating stats in:\n- seconds')
+        self.je_countdown.grid(row=0, column=1, padx=10, pady=10, sticky='nsew')
+        self.update_countdown()
 
-    def __draw_chess_grid(self) -> None:
-        """
-        Draws a chessboard-style grid on the map image.
+        self.reset_map_btn = ttk.Button(self.sidebar_frame, width=20, text='Reset Map', command=self.reset_map)
+        self.reset_map_btn.grid(row=0, column=2, padx=10, pady=10, sticky='nsew')
 
-        Adds vertical and horizontal lines and labels (A-H, 1-8).
-        """
+        seperator = ttk.Separator(self.sidebar_frame, orient='horizontal')
+        seperator.grid(row=1, column=0, columnspan=3, padx=10, pady=(0, 10), sticky='new')
 
-        cols = 8
-        rows = 8
+        self.player_frame = ttk.Frame(self.sidebar_frame)
+        self.player_frame.grid(row=2, column=0, columnspan=3, padx=10, pady=(0, 10), sticky='nsew')
+        self.player_frame.grid_columnconfigure(0, weight=1)
 
-        w, h = self.raw_image.size
-        cell_w = w / cols
-        cell_h = h / rows
+        self.je_thread = threading.Thread(target=self.je_worker, daemon=True)
+        self.je_thread.start()
 
-        draw = ImageDraw.Draw(self.raw_image)
-
-        # Semi-transparent white lines
-        line_color = (255, 255, 255, 160)
-
-        # Draw vertical lines
-        for c in range(cols + 1):
-            x = c * cell_w
-            draw.line((x, 0, x, h), fill=line_color, width=1)
-
-        # Draw horizontal lines
-        for r in range(rows + 1):
-            y = r * cell_h
-            draw.line((0, y, w, y), fill=line_color, width=1)
-
-        # Draw chess labels
-        letters = "ABCDEFGH"
-
-        for c in range(cols):
-            draw.text((c * cell_w + 15, 5), letters[c], fill=line_color)
-
-        for r in range(rows):
-            draw.text((5, r * cell_h + 15), str(r + 1), fill=line_color)
+        self.redraw_player_list()
