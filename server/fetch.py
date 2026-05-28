@@ -49,9 +49,11 @@ class Client:
 
         # URL did not return OK
         if not response.ok:
+            print('"{}" Failed! [{}]: {}'.format(url, status, reason))
             #lr.Log.error('"{}" Failed! [{}]: {}'.format(url, status, reason))
             return
 
+        print('"{}" Succeeded! [{}]: {}'.format(url, status, reason))
         #lr.Log.debug('"{}" Succeeded! [{}]: {}'.format(url, status, reason))
 
         return BeautifulSoup(response.text, 'lxml')
