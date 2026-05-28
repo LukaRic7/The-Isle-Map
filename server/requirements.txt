@@ -4,3 +4,4 @@ python-socketio[client]
 aiohttp
 beautifulsoup4
 loggerric
+colorama
