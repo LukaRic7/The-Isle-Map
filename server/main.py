@@ -87,6 +87,7 @@ async def connect(client_id:str, environment_values:dict, authentication:dict):
     obs = Observer(auth.get('je-cookie'), user_agent=auth.get('user-agent')) if auth.get('je-cookie') else None
     if not obs:
         pass
+        print('New client did not provide an observer!')
         #lr.Log.warn('New client did not provide an observer!')
 
     client_cache[client_id] = PlayerInformation(
@@ -161,8 +162,10 @@ async def fetching_worker():
         for client_id, client_data in client_cache.items():
             try:
                 if client_data.observer:
+                    print('Client has an observer')
                     data = client_data.observer.fetch()
                     if data:
+                        print('Client had data!')
                         client_data.health = {
                             'percent': data.get('current').get('Health'),
                             'deltarate': data.get('delta-per-min', {}).get('Health'),
