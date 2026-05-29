@@ -77,7 +77,7 @@ class Gui(ttk.Frame):
         draw = ImageDraw.Draw(chess_overlay)
 
         # Player coords
-        self.update()
+        #self.update()
         print('__render_scaled_image', self.online_mode, self.sio.connected)
         if self.online_mode and self.sio.connected:
             for client_id, player_data in self.player_list.items():
@@ -272,7 +272,7 @@ class Gui(ttk.Frame):
                     ('health', client_data['health']), ('growth', client_data['growth']),
                     ('hunger', client_data['hunger']), ('thirst', client_data['thirst'])]):
                     self.player_list_widgets[client_id][key]['percent'].configure(text=f"{(stat.get('percent', 0) or 0) * 100:.0f}%")
-                    self.player_list_widgets[client_id][key]['change'].configure(text=f"{stat.get('deltarate', 0) or 0:.2f}%/m")
+                    self.player_list_widgets[client_id][key]['change'].configure(text=f"{(stat.get('deltarate', 0) or 0) * 100:.2f}%/m")
                     self.player_list_widgets[client_id][key]['eta'].configure(text=f"{stat.get('eta_top', 0) or 0:.0f} min")
         else:
             if self.player_list_widgets.get('OFFLINE') == None:
@@ -333,7 +333,7 @@ class Gui(ttk.Frame):
                 ('health', self.offline_stats.health), ('growth', self.offline_stats.growth),
                 ('hunger', self.offline_stats.hunger), ('thirst', self.offline_stats.thirst)]):
                 self.player_list_widgets['OFFLINE'][key]['percent'].configure(text=f"{(stat.get('percent', 0) or 0) * 100:.0f}%")
-                self.player_list_widgets['OFFLINE'][key]['change'].configure(text=f"{stat.get('deltarate', 0) or 0:.2f}%/m")
+                self.player_list_widgets['OFFLINE'][key]['change'].configure(text=f"{(stat.get('deltarate', 0) or 0) * 100:.2f}%/m")
                 self.player_list_widgets['OFFLINE'][key]['eta'].configure(text=f"{stat.get('eta_top', 0) or 0:.0f} min")
             
     def on_new_local_coords(self, coords:tuple[float, float]):
@@ -385,7 +385,7 @@ class Gui(ttk.Frame):
         lr.Log.debug('JE Worker killed!')
 
     def update_countdown(self):
-        self.je_countdown.configure(text=f'Updating stats in:\n{get_seconds_till_next_minute()} seconds')
+        self.je_countdown.configure(text=f'Updating stats in:\n{get_seconds_till_next_minute() + 3} seconds')
 
         self.root.after(1000, self.update_countdown)
 
