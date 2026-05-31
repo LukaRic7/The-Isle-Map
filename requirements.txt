@@ -1,6 +1,0 @@
-loggerric
-socketric
-pillow
-pyperclip
-python-socketio[client]
-aiohttp
