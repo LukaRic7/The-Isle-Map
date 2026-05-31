@@ -47,6 +47,7 @@ class Coord:
 class Client:
     coordinates:deque[Coord]=field(default_factory=lambda: deque(maxlen=16))
     last_coordinate_utc_ts:int=0
+    pin_position:tuple[float, float]=field(default_factory=tuple)
     alias:str='Unknown Client'
     color:str='#ff0000'
     je:JurassicEchoes=None

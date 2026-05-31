@@ -44,13 +44,17 @@ async def disconnect_protocol(client_id:str):
     del client_cache[client_id]
 
     # Broadcast the new locations without the disconnected client to everyone
-    data = {
+    coord_data = {
         client_data.color: [
             coord.coordinates for coord in client_data.coordinates
         ]
         for client_data in client_cache.values()
     }
-    await sio.emit('update-map', data)
+    pin_data = {
+        client_data.color: client_data.pin_position
+        for client_data in client_cache.values()
+    }
+    await sio.emit('update-map', (coord_data, pin_data))
 
     # Broadcast the new client list to everyone
     data = {
@@ -121,13 +125,17 @@ async def connect(client_id:str, environment_values:dict, authentication:dict):
     )
 
     # Broadcast the locations to the new client
-    data = {
+    coord_data = {
         client_data.color: [
             coord.coordinates for coord in client_data.coordinates
         ]
         for client_data in client_cache.values()
     }
-    await sio.emit('update-map', data, client_id)
+    pin_data = {
+        client_data.color: client_data.pin_position
+        for client_data in client_cache.values()
+    }
+    await sio.emit('update-map', (coord_data, pin_data), client_id)
 
     # Broadcast the new client list to everyone
     data = {
@@ -199,13 +207,17 @@ async def updated_location(client_id:str, coordinates:list[float, float]):
     client_cache[client_id].last_coordinate_utc_ts = utc_ts
 
     # Broadcast the new location to everyone
-    data = {
+    coord_data = {
         client_data.color: [
             coord.coordinates for coord in client_data.coordinates
         ]
         for client_data in client_cache.values()
     }
-    await sio.emit('update-map', data)
+    pin_data = {
+        client_data.color: client_data.pin_position
+        for client_data in client_cache.values()
+    }
+    await sio.emit('update-map', (coord_data, pin_data))
 
 @sio.on('reset-coordinates')
 async def reset_coordinates(client_id:str):
@@ -227,13 +239,47 @@ async def reset_coordinates(client_id:str):
     client_cache[client_id].coordinates.clear()
 
     # Broadcast the reset to everyone
-    data = {
+    coord_data = {
         client_data.color: [
             coord.coordinates for coord in client_data.coordinates
         ]
         for client_data in client_cache.values()
     }
-    await sio.emit('update-map', data)
+    pin_data = {
+        client_data.color: client_data.pin_position
+        for client_data in client_cache.values()
+    }
+    await sio.emit('update-map', (coord_data, pin_data))
+
+@sio.on('pin-location')
+async def pin_location(client_id:str, location:list[float, float]):
+    # Make sure user exists in the cache
+    if not client_cache.get(client_id):
+        lr.Log.warn(f'Non-cached user "{client_id}" tried pin location!',
+                    highlight=client_id)
+        return
+    
+    lr.Log.debug(f'Client "{client_id}" pinned a location!',
+                 highlight=client_id)
+
+    # Check if the client is trying to remove their pin
+    if location[0] == None and location[1] == None:
+        client_cache[client_id].pin_position = None
+    else:
+        client_cache[client_id].pin_position = location
+
+    # Broadcast the update to everyone
+    coord_data = {
+        client_data.color: [
+            coord.coordinates for coord in client_data.coordinates
+        ]
+        for client_data in client_cache.values()
+    }
+    pin_data = {
+        client_data.color: client_data.pin_position
+        for client_data in client_cache.values()
+    }
+    await sio.emit('update-map', (coord_data, pin_data))
 
 async def fetching_worker():
     """
@@ -341,20 +387,3 @@ def main():
         lr.Log.info('Keyboard interrupt detected, quitting!')
 
 if __name__ == '__main__': main()
-
-# -> update-map : { client_id: list[{ ts, coord }] }
-#   - Broadcast: When a player updates their location
-#   - Individual: When a new player connects
-#   - Broadcast: When a player disconnects
-# -> update-player-list : { client_id: dict[] }
-#   - Broadcast: When a new player connects
-#   - Broadcast: When a player disconnects
-#   - Broadcast: Minutely, after fetching
-# -> heartbeat : {}
-#   - Broadcast: Every 5 seconds
-
-# <- updated-location : { client_id, coord }
-# <- reset-coordinates : { client_id }
-# <- heartbeat : { client_id }
-# <- connect : { client_id, ip, password, cookie, user_agent, alias }
-# <- disconnect : { client_id }
