@@ -8,7 +8,7 @@ WORKDIR /app
 COPY . /app
 
 # Install dependencies from requirements.txt
-RUN pip install --no-cache-dir -r /app/src/server/requirements.txt
+RUN pip install --no-cache-dir -r /app/server/requirements.txt
 
 EXPOSE 8080
 
