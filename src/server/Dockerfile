@@ -10,6 +10,6 @@ COPY . /app
 # Install dependencies from requirements.txt
 RUN pip install --no-cache-dir -r /app/server/requirements.txt
 
-EXPOSE 8080
+EXPOSE 56556
 
 CMD ["python", "-m", "server.main"]

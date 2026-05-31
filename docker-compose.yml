@@ -6,8 +6,8 @@ services:
       context: ./src
       dockerfile: server/Dockerfile
     environment:
-      - PORT=${SERVER_PORT:-8080}
+      - PORT=56556
       - PYTHONUNBUFFERED=1
     ports:
-      - "${SERVER_PORT:-8080}:8080"
+      - "56556:56556"
     restart: unless-stopped
