@@ -244,7 +244,7 @@ class Gui(ttk.Frame):
                     'health_delta': health_delta, 'growth': growth,
                     'growth_percent': growth_percent, 'growth_eta': growth_eta,
                     'growth_delta': growth_delta, 'hunger': hunger,
-                    'hunger_percent': hunger_delta, 'hunger_eta': hunger_eta,
+                    'hunger_percent': hunger_percent, 'hunger_eta': hunger_eta,
                     'hunger_delta': hunger_delta, 'thirst': thirst,
                     'thirst_percent': thirst_percent, 'thirst_eta': thirst_eta,
                     'thirst_delta': thirst_delta
@@ -312,7 +312,8 @@ class Gui(ttk.Frame):
                     text=f'{(data.je.thirst.eta_to_bounds or 0):.0f} min'
                 )
 
-    def render_map(self, coordinate_map:dict[str, list]=None):
+    def render_map(self, coordinate_map:dict[str, list]=None,
+                   pin_map:dict[str, tuple]=None):
         width = self.__canvas_frame.winfo_width()
         height = self.__canvas_frame.winfo_height()
 
@@ -323,9 +324,15 @@ class Gui(ttk.Frame):
                 ]
                 for client_data in self.client_list.values()
             }
+        
+        if not pin_map:
+            pin_map = {
+                client_data.color: client_data.pin_position
+                for client_data in self.client_list.values()
+            }
 
         rendered = render_scaled_image(
-            self.__base_image, width, height, coordinate_map,
+            self.__base_image, width, height, coordinate_map, pin_map,
             self.__config.get('map', {}).get('world_bounds')
         )
 
@@ -397,6 +404,47 @@ class Gui(ttk.Frame):
                 self.client_list['OFFLINE'].coordinates.clear()
                 self.render_map()
 
+    def __canvas_leftclick(self, event:tk.Event=None):
+        canvas_w = self.__canvas.winfo_width()
+        canvas_h = self.__canvas.winfo_height()
+
+        img_w, img_h = self.__base_image.size
+
+        scale = min(canvas_w / img_w, canvas_h / img_h)
+
+        rendered_w = img_w * scale
+        rendered_h = img_h * scale
+
+        offset_x = (canvas_w - rendered_w) / 2
+        offset_y = (canvas_h - rendered_h) / 2
+
+        # Position relative to rendered image
+        rel_x = event.x - offset_x
+        rel_y = event.y - offset_y
+
+        # Ignore clicks in letterboxing
+        if not (0 <= rel_x <= rendered_w and 0 <= rel_y <= rendered_h):
+            return
+
+        # Normalize to 0..1
+        nx = rel_x / rendered_w
+        ny = rel_y / rendered_h
+
+        if self.__sio.connected:
+            self.__sio.emit('pin-location', [nx, ny])
+        else:
+            if self.client_list.get('OFFLINE'):
+                self.client_list['OFFLINE'].pin_position = (nx, ny)
+                self.render_map()
+
+    def __canvas_rightclick(self, event:tk.Event=None):
+        if self.__sio.connected:
+            self.__sio.emit('pin-location', [None, None])
+        else:
+            if self.client_list.get('OFFLINE'):
+                self.client_list['OFFLINE'].pin_position = None
+                self.render_map()
+
     def __add_widgets(self):
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -410,6 +458,8 @@ class Gui(ttk.Frame):
                                 highlightthickness=0)
         self.__canvas.grid(row=0, column=0, sticky='nsew')
         self.__canvas.bind('<Configure>', self.__schedule_map_render)
+        self.__canvas.bind('<ButtonRelease-1>', self.__canvas_leftclick)
+        self.__canvas.bind('<ButtonRelease-3>', self.__canvas_rightclick)
 
         self.__sidebar_frame = ttk.Frame(self)
         self.__sidebar_frame.grid(row=0, column=1, sticky='nsew')

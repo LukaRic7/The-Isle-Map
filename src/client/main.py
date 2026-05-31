@@ -58,10 +58,10 @@ def auth_error(reason:str):
     app.set_status_text(reason, bad=True)
 
 @sio.on('update-map')
-def update_map(coordinate_map:dict):
+def update_map(coordinate_map:dict, pin_map:dict):
     if not app: return
 
-    app.render_map(coordinate_map)
+    app.render_map(coordinate_map, pin_map)
 
 @sio.on('update-player-list')
 def update_player_list(player_list:dict):

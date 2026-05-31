@@ -49,6 +49,7 @@ def translate_coords(coord:tuple[float, float], image_size:tuple[int, int],
 
 def render_scaled_image(base_image:Image.Image, target_width:int,
                         target_height:int, coordinates:dict[str, list[tuple]],
+                        pin_map:dict[str, tuple],
                         bounds:dict[str, int]) -> Image.Image:
     """
     **Render a scaled image of the map, rendering coords and chess grid.**
@@ -84,6 +85,18 @@ def render_scaled_image(base_image:Image.Image, target_width:int,
     overlay = Image.new('RGBA', (target_width, target_height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
 
+    # Pin locations
+    for color, pin_scale in pin_map.items():
+        if not pin_scale: continue
+
+        x = new_size[0] * pin_scale[0] + offset_x
+        y = new_size[1] * pin_scale[1] + offset_y
+
+        radius = int(new_size[0] * 0.03)
+
+        draw.circle((x, y), radius=radius, fill=None, outline=color, width=2)
+
+    # Location lines
     for color, coordlist in coordinates.items():
         # Precompute coords
         translated = []
@@ -106,7 +119,7 @@ def render_scaled_image(base_image:Image.Image, target_width:int,
                 radius = int(new_size[0] * 0.008)
                 draw.ellipse(
                     (x - radius, y - radius, x + radius, y + radius),
-                    fill=color, outline='#ffffff', width= 1
+                    fill=color, outline='#ffffff', width=1
                 )
             else:
                 radius = int(new_size[0] * 0.005)
