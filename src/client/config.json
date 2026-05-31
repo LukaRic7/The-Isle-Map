@@ -1,0 +1,11 @@
+{
+    "online": { "ip": "192.168.0.40", "port": 56556, "password": "pass", "alias": "ALIAS" },
+    "map": {
+        "filename": "TheIsleMap_Jan2026.png",
+        "world_bounds": { "min_x": -480, "max_x": 605, "min_y": 500, "max_y": -575 }
+    },
+    "jurassic_echoes": {
+        "cookie": "",
+        "user_agent": ""
+    }
+}

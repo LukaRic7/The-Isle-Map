@@ -1,0 +1,19 @@
+# Ignore everything by default
+*
+
+# But keep server and shared folders and compose/Dockerfile/requirements
+!server/
+!shared/
+!server/**
+!shared/**
+!docker-compose.yml
+!server/Dockerfile
+!requirements.txt
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Git
+.git
+.gitignore
