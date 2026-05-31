@@ -1,6 +1,0 @@
-__pycache__/
-dist/
-build/
-*.spec
-.vscode/
-start.vbs
