@@ -1,8 +1,0 @@
-pillow
-pyperclip
-python-socketio[client]
-aiohttp
-beautifulsoup4
-loggerric
-colorama
-lxml

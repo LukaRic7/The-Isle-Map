@@ -1,5 +1,0 @@
-{
-    "password": "pass",
-    "port": 56556,
-    "heartbeat": { "interval_sec": 5, "timeout_sec": 2 }
-}
