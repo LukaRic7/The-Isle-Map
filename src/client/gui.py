@@ -8,13 +8,20 @@ from tkinter import ttk
 import loggerric as lr
 import tkinter as tk
 
-ROOT = Path(__file__).resolve().parents[1]
+# Handle both normal execution and PyInstaller bundled exe
+if getattr(sys, 'frozen', False):
+    # Running as PyInstaller exe
+    ROOT = Path(sys._MEIPASS).parent
+else:
+    # Running as script
+    ROOT = Path(__file__).resolve().parents[1]
+
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from shared.datastructs import Client, JurassicEchoes, deserialize_client
 from shared.je_fetching import Observer, get_sleep_time
-from rendering import render_scaled_image
+from client.rendering import render_scaled_image
 from shared.utils import get_exe_path
 
 class Gui(ttk.Frame):

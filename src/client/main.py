@@ -4,14 +4,21 @@ from pathlib import Path
 import loggerric as lr
 import tkinter as tk
 
-ROOT = Path(__file__).resolve().parents[1]
+# Handle both normal execution and PyInstaller bundled exe
+if getattr(sys, 'frozen', False):
+    # Running as PyInstaller exe
+    ROOT = Path(sys._MEIPASS).parent
+else:
+    # Running as script
+    ROOT = Path(__file__).resolve().parents[1]
+
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from shared.utils import set_project_root, get_exe_path
 from shared.je_fetching import get_sleep_time
 from shared.datastructs import Coord, JEStat
-from gui import Gui
+from client.gui import Gui
 
 set_project_root(ROOT)
 

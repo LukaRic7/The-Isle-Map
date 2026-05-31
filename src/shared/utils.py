@@ -12,10 +12,13 @@ def __get_base_path() -> Path:
     *Returns*:
     - (Path): The base filesystem path for resolving resources.
     """
-    try:
-        return Path(sys._MEIPASS)
-    except AttributeError:
-        return get_project_root()
+    # Prefer PyInstaller bundle extraction dir when present
+    meipass = getattr(sys, '_MEIPASS', None)
+    if meipass:
+        return Path(meipass)
+
+    # Fall back to project root
+    return get_project_root()
 
 def set_project_root(root:Union[str, Path]):
     """
@@ -54,7 +57,69 @@ def resource_path(relative_path: str) -> str:
     *Returns*:
     - (str): The resolved absolute filesystem path as a string.
     """
-    return str((__get_base_path() / relative_path).resolve())
+    tried = []
+
+    # 1) Inside the PyInstaller bundle extraction directory
+    meipass = getattr(sys, '_MEIPASS', None)
+    if meipass:
+        p = (Path(meipass) / relative_path)
+        tried.append(str(p))
+        if p.exists():
+            return str(p.resolve())
+
+    # 2) If running as a frozen executable, check the exe directory
+    if getattr(sys, 'frozen', False):
+        exe_dir = Path(sys.executable).parent
+        # Normal check: exe_dir / relative_path
+        p = (exe_dir / relative_path)
+        tried.append(str(p))
+        if p.exists():
+            return str(p.resolve())
+
+        # If exe is placed inside a package folder (e.g., exe in .../client),
+        # and relative_path begins with that package name, strip the leading
+        # segment to avoid duplicated paths like client/client/...
+        parts = Path(relative_path).parts
+        if parts and parts[0].lower() == exe_dir.name.lower():
+            stripped = Path(*parts[1:])
+            p = exe_dir / stripped
+            tried.append(str(p))
+            if p.exists():
+                return str(p.resolve())
+
+        # Also allow the resource to live next to the exe using only its basename
+        p = exe_dir / Path(relative_path).name
+        tried.append(str(p))
+        if p.exists():
+            return str(p.resolve())
+
+    # 3) Check current working directory
+    cwd = Path.cwd()
+    p = cwd / relative_path
+    tried.append(str(p))
+    if p.exists():
+        return str(p.resolve())
+    p = cwd / Path(relative_path).name
+    tried.append(str(p))
+    if p.exists():
+        return str(p.resolve())
+
+    # 4) Finally, check the configured project root
+    base = __get_base_path()
+    p = base / relative_path
+    tried.append(str(p))
+    if p.exists():
+        return str(p.resolve())
+    p = base / Path(relative_path).name
+    tried.append(str(p))
+    if p.exists():
+        return str(p.resolve())
+
+    # If nothing found, raise a helpful error listing attempted locations
+    raise FileNotFoundError(
+        f"Resource not found: '{relative_path}'. Tried the following locations:\n"
+        + "\n".join(tried)
+    )
 
 def get_exe_path(relative_path: str) -> str:
     """

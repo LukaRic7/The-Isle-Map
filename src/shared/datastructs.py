@@ -5,7 +5,14 @@ from pathlib import Path
 import loggerric as lr
 import sys
 
-ROOT = Path(__file__).resolve().parents[1]
+# Handle both normal execution and PyInstaller bundled exe
+if getattr(sys, 'frozen', False):
+    # Running as PyInstaller exe
+    ROOT = Path(sys._MEIPASS).parent
+else:
+    # Running as script
+    ROOT = Path(__file__).resolve().parents[1]
+
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
