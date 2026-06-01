@@ -1,4 +1,4 @@
-import socketio, json, threading, time, pyperclip, sys
+import socketio, json, threading, time, pyperclip, sys, re
 from datetime import datetime as dt, timezone as tz
 from pathlib import Path
 import loggerric as lr
@@ -178,17 +178,21 @@ def clipboard_worker():
 
         s = clip.replace(' ', '')
         if s.count(',') != 5: continue
+        
         try:
             for part in s.split(','):
                 float(part)
+
             parsed_coords = []
             for index, segment in enumerate(clip.split(',')):
                 if index % 2 != 0: continue
                 parsed_coords.append(float(segment))
+
             if sio.connected:
                 sio.emit('updated-location', parsed_coords[0:2])
             else:
                 if not app: continue
+                
                 if app.client_list.get('OFFLINE'):
                     app.client_list['OFFLINE'].coordinates.append(Coord(
                         utc_timestamp=int(dt.now(tz=tz.utc).timestamp()),
