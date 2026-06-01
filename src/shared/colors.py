@@ -39,7 +39,6 @@ class ColorManager:
     - `reset() -> None`: Clears all assigned colors, making the entire pool
     available again.
     """
-
     _available_colors = [
         "#F6C945",  # Gold
         "#F0672E",  # Orange

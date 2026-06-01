@@ -28,7 +28,6 @@ class Client:
     *Methods*:
     - `fetch(path) -> BeautifulSoup`: Parsed HTML response from the endpoint.
     """
-
     def __init__(self, base_url:str, cookie:str, user_agent:str):
         """
         **Initializer.**
@@ -89,7 +88,6 @@ class Observer:
     - `extract_info(soup) -> dict`: Extract information from parsed HTML soup.
     - `mainloop() -> None`: Enter the mainloop, uses while true.
     """
-
     def __init__(self, je_cookie:str, user_agent:str):
         """
         **Initializer.**
@@ -262,6 +260,9 @@ class Observer:
         return species[1].text
 
     def fetch(self):
+        """
+        **Fetch all relevant Jurassic Echoes data from their API.**
+        """
         soup = self.Client.fetch('player')
         self.is_down = self.Client.is_down
         if not soup: return

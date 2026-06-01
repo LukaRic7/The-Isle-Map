@@ -2,7 +2,6 @@ from datetime import datetime as dt, timezone as tz
 from dataclasses import dataclass, asdict, field
 from collections import deque
 from pathlib import Path
-import loggerric as lr
 import sys
 
 # Handle both normal execution and PyInstaller bundled exe

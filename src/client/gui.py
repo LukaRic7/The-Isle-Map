@@ -1,8 +1,6 @@
-from datetime import datetime as dt, timezone as tz, timedelta
-import pyperclip, json, socketio, threading, math, time, sys
-from PIL import Image, ImageDraw, ImageTk
-from dataclasses import dataclass, field, asdict
-from collections import deque
+from datetime import datetime as dt, timezone as tz
+import socketio, threading, time, sys
+from PIL import Image, ImageTk
 from pathlib import Path
 from tkinter import ttk
 import loggerric as lr
@@ -25,6 +23,19 @@ from client.rendering import render_scaled_image
 from shared.utils import get_exe_path
 
 class Gui(ttk.Frame):
+    """
+    **The GUI class.**
+    
+    Builds the GUI, handles all control inputs.
+    
+    *Methods*:
+    - `update_player_list(new_client_list) -> None`: Updates the player list
+    based on new or cached information.
+    - `render_map(coordinate_map) -> None`: Render the map and display it.
+    - `set_status_text(text, bad) -> None`: Sets the status text.
+    - `tgl_connect() -> None`: Toggle the server connection.
+    - `reset_coordinates() -> None`: Reset the clients own coordinates.
+    """
     def __init__(self, root:tk.Tk, sio:socketio.Client, config:dict):
         super().__init__(root)
 
@@ -51,6 +62,10 @@ class Gui(ttk.Frame):
         self.after(500, self.__update_countdown)
 
     def __update_countdown(self):
+        """
+        **Updates the countdown timer between JE fetches and client list
+        updates.**
+        """
         now_ts = int(time.time())
         if self.__next_update_ts - now_ts <= 0:
             self.__next_update_ts = get_sleep_time() + now_ts
@@ -61,6 +76,15 @@ class Gui(ttk.Frame):
 
     def update_player_list(self, new_client_list:dict[str, Client]=None,
                            disconnected:bool=False):
+        """
+        **Updates the player list based on new or cached information.**
+        
+        *Parameters*:
+        - `new_client_list` (dict[str, Client]): The new client list to replace
+        the cached one.
+        - `disconnected` (bool): Weather to use public or private client list.
+        Defaults to false.
+        """
         if disconnected and not self.client_list.get('OFFLINE'):
             je:dict = self.__config.get('jurassic_echoes')
             jurassic_echoes:JurassicEchoes = None
@@ -314,6 +338,13 @@ class Gui(ttk.Frame):
 
     def render_map(self, coordinate_map:dict[str, list]=None,
                    pin_map:dict[str, tuple]=None):
+        """
+        **Render the map and display it.**
+        
+        *Parameters*:
+        - `coordinate_map` (dict[str, list]): The list of coordinates to render.
+        - `pin_map` (dict[str, tuple]): The list of pins to render.
+        """
         width = self.__canvas_frame.winfo_width()
         height = self.__canvas_frame.winfo_height()
 
@@ -343,12 +374,26 @@ class Gui(ttk.Frame):
         )
 
     def __schedule_map_render(self, event:tk.Event=None):
+        """
+        **Schedule the map to render.**
+        
+        *Parameters*:
+        - `event` (tk.Event): The event associated with the function call.
+        """
         if self.__render_job is not None:
             self.after_cancel(self.__render_job)
         
         self.__render_job = self.after(5, self.render_map)
 
     def set_status_text(self, text:str, bad:bool=False):
+        """
+        **Sets the status text.**
+        
+        *Parameters*:
+        - `text` (str): The text to display.
+        - `bad` (bool): If the text should be frozen for a bit, and the
+        foreground color to be red. Defaults to false.
+        """
         utc_ts = int(dt.now(tz=tz.utc).timestamp())
         if bad and utc_ts < self.__last_status_text_utc_ts + 5: return
         if bad: self.__last_status_text_utc_ts = utc_ts
@@ -357,6 +402,9 @@ class Gui(ttk.Frame):
         self.__status_text.configure(text=text, foreground=color)
 
     def tgl_connect(self):
+        """
+        **Toggle the server connection.**
+        """
         if self.__sio.connected:
             self.__sio.disconnect()
             self.connect_btn.configure(text='Connect')
@@ -365,6 +413,9 @@ class Gui(ttk.Frame):
             return
 
         def connect_worker():
+            """
+            **Connects to the server in a thread to not freeze the GUI.**
+            """
             try:
                 oc:dict = self.__config.get('online', {})
                 je:dict = self.__config.get('jurassic_echoes', {})
@@ -395,6 +446,9 @@ class Gui(ttk.Frame):
         threading.Thread(target=connect_worker, daemon=True).start()
 
     def reset_coordinates(self):
+        """
+        **Reset the clients own coordinates.**
+        """
         lr.Log.debug('Resetting coordinates!')
 
         if self.__sio.connected:
@@ -405,6 +459,12 @@ class Gui(ttk.Frame):
                 self.render_map()
 
     def __canvas_leftclick(self, event:tk.Event=None):
+        """
+        **Called when the client left clicks on the canvas.**
+        
+        *Parameters*:
+        - `event` (tk.Event): The event associated with the function call.
+        """
         canvas_w = self.__canvas.winfo_width()
         canvas_h = self.__canvas.winfo_height()
 
@@ -438,6 +498,12 @@ class Gui(ttk.Frame):
                 self.render_map()
 
     def __canvas_rightclick(self, event:tk.Event=None):
+        """
+        **Called when the client right clicks on the canvas.**
+        
+        *Parameters*:
+        - `event` (tk.Event): The event associated with the function call.
+        """
         if self.__sio.connected:
             self.__sio.emit('pin-location', [None, None])
         else:
@@ -446,6 +512,9 @@ class Gui(ttk.Frame):
                 self.render_map()
 
     def __add_widgets(self):
+        """
+        **Adds widgets to the GUI.**
+        """
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 

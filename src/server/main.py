@@ -253,6 +253,13 @@ async def reset_coordinates(client_id:str):
 
 @sio.on('pin-location')
 async def pin_location(client_id:str, location:list[float, float]):
+    """
+    **Called when a user pins a location on the map.**
+    
+    *Parameters*:
+    - `client_id` (str): The ID of the client pinning their location.
+    - `location` (list[float, float]): The scaled location of the pin.
+    """
     # Make sure user exists in the cache
     if not client_cache.get(client_id):
         lr.Log.warn(f'Non-cached user "{client_id}" tried pin location!',

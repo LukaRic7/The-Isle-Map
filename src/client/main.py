@@ -36,6 +36,9 @@ with open(get_exe_path('client/config.json'), 'r') as file:
 
 @sio.event
 def connect():
+    """
+    **Called when the client successfully connected.**
+    """
     global last_heartbeat_utc_ts
 
     lr.Log.info('Client connected to server!')
@@ -44,6 +47,9 @@ def connect():
 
 @sio.event
 def disconnect():
+    """
+    **Called when the client successfully disconnects.**
+    """
     lr.Log.info('Disconnected from server!')
     
     if not app: return
@@ -53,18 +59,37 @@ def disconnect():
 
 @sio.on('auth-error')
 def auth_error(reason:str):
+    """
+    **Called when the server sends an authentication error message.**
+    
+    *Parameters*:
+    - `reason` (str): The error reason message.
+    """
     if not app: return
 
     app.set_status_text(reason, bad=True)
 
 @sio.on('update-map')
 def update_map(coordinate_map:dict, pin_map:dict):
+    """
+    **Called when a player on the server updated their map.**
+    
+    *Parameters*:
+    - `coordinate_map` (dict): The list of coordinates and belonging to whom.
+    - `pin_map` (dict): The list of pinned places and belonging to whom.
+    """
     if not app: return
 
     app.render_map(coordinate_map, pin_map)
 
 @sio.on('update-player-list')
 def update_player_list(player_list:dict):
+    """
+    **Called when this client needs to update their player list.**
+    
+    *Parameters*:
+    - `player_list` (dict): The player data.
+    """
     if not app: return
 
     app.update_player_list(player_list)
@@ -79,6 +104,9 @@ def heartbeat():
     last_heartbeat_utc_ts = int(dt.now(tz=tz.utc).timestamp())
 
 def fetching_worker():
+    """
+    **Called by a thread. Worker fetching data from the Jurassic Echoes API.**
+    """
     global stop_threads
 
     while not stop_threads:
