@@ -53,6 +53,13 @@ class Gui(ttk.Frame):
             self.__config.get('map', {}).get('filename')
         )))
 
+        self.__zoom = 1.0
+        self.__pan_x = 0
+        self.__pan_y = 0
+        self.__dragging = False
+        self.__drag_start_x = 0
+        self.__drag_start_y = 0
+
         self.client_list:dict[str, Client] = {}
         self.__client_widget_list:dict[str, dict[str, ttk.Widget]] = {}
 
@@ -363,7 +370,8 @@ class Gui(ttk.Frame):
             }
 
         rendered = render_scaled_image(
-            self.__base_image, width, height, coordinate_map, pin_map,
+            self.__base_image, width, height, coordinate_map, self.__zoom,
+            (self.__pan_x, self.__pan_y), pin_map,
             self.__config.get('map', {}).get('world_bounds')
         )
 
@@ -470,13 +478,13 @@ class Gui(ttk.Frame):
 
         img_w, img_h = self.__base_image.size
 
-        scale = min(canvas_w / img_w, canvas_h / img_h)
+        scale = min(canvas_w / img_w, canvas_h / img_h) * self.__zoom
 
         rendered_w = img_w * scale
         rendered_h = img_h * scale
 
-        offset_x = (canvas_w - rendered_w) / 2
-        offset_y = (canvas_h - rendered_h) / 2
+        offset_x = (canvas_w - rendered_w) / 2 + self.__pan_x
+        offset_y = (canvas_h - rendered_h) / 2 + self.__pan_y
 
         # Position relative to rendered image
         rel_x = event.x - offset_x
@@ -511,6 +519,73 @@ class Gui(ttk.Frame):
                 self.client_list['OFFLINE'].pin_position = None
                 self.render_map()
 
+    def __mousewheel(self, event:tk.Event=None):
+        """
+        **Called when the client scrolls the mouse wheel, hovering the canvas.**
+        
+        *Parameters*:
+        - `event` (tk.Event): The event associated with the function call.
+        """
+        self.__zoom += 0.1 * (1 if event.delta > 0 else -1)
+        self.__zoom = max(1.0, min(3.0, self.__zoom))
+
+        self.render_map()
+
+    def __pan_start(self, event:tk.Event=None):
+        """
+        **Called when panning starts and records positions.**
+        
+        *Parameters*:
+        - `event` (tk.Event): The event associated with the function call.
+        """
+        self.__dragging = True
+        self.__drag_start_x = event.x
+        self.__drag_start_y = event.y
+
+    def __pan_move(self, event:tk.Event=None):
+        """
+        **Called when panning moves, calculates panning offsets.**
+        
+        *Parameters*:
+        - `event` (tk.Event): The event associated with the function call.
+        """
+        dx = event.x - self.__drag_start_x
+        dy = event.y - self.__drag_start_y
+
+        self.__pan_x += dx
+        self.__pan_y += dy
+
+        max_pan = int(self.__tk_image.width())
+        self.__pan_x = max(-max_pan, min(max_pan, self.__pan_x))
+        self.__pan_y = max(-max_pan, min(max_pan, self.__pan_y))
+
+        self.__drag_start_x = event.x
+        self.__drag_start_y = event.y
+
+        self.render_map()
+
+    def __pan_stop(self, event:tk.Event=None):
+        """
+        **Called when panning stops.**
+        
+        *Parameters*:
+        - `event` (tk.Event): The event associated with the function call.
+        """
+        self.__dragging = False
+
+    def __double_click_mouse_wheel(self, event:tk.Event=None):
+        """
+        **Called when the middle mouse is double clicked, resets pan and zoom.**
+        
+        *Parameters*:
+        - `event` (tk.Event): The event associated with the function call.
+        """
+        self.__pan_x = 0
+        self.__pan_y = 0
+        self.__zoom = 1.0
+
+        self.render_map()
+
     def __add_widgets(self):
         """
         **Adds widgets to the GUI.**
@@ -529,6 +604,11 @@ class Gui(ttk.Frame):
         self.__canvas.bind('<Configure>', self.__schedule_map_render)
         self.__canvas.bind('<ButtonRelease-1>', self.__canvas_leftclick)
         self.__canvas.bind('<ButtonRelease-3>', self.__canvas_rightclick)
+        self.__canvas.bind('<MouseWheel>', self.__mousewheel)
+        self.__canvas.bind('<ButtonPress-2>', self.__pan_start)
+        self.__canvas.bind('<B2-Motion>', self.__pan_move)
+        self.__canvas.bind('<ButtonRelease-2>', self.__pan_stop)
+        self.__canvas.bind("<Double-Button-2>", self.__double_click_mouse_wheel)
 
         self.__sidebar_frame = ttk.Frame(self)
         self.__sidebar_frame.grid(row=0, column=1, sticky='nsew')

@@ -49,6 +49,7 @@ def translate_coords(coord:tuple[float, float], image_size:tuple[int, int],
 
 def render_scaled_image(base_image:Image.Image, target_width:int,
                         target_height:int, coordinates:dict[str, list[tuple]],
+                        zoom:float, panning:tuple[float, float],
                         pin_map:dict[str, tuple],
                         bounds:dict[str, int]) -> Image.Image:
     """
@@ -68,7 +69,7 @@ def render_scaled_image(base_image:Image.Image, target_width:int,
     """
 
     base_width, base_height = base_image.size
-    scale = min(target_width / base_width, target_height / base_height)
+    scale = min(target_width / base_width, target_height / base_height) * zoom
     new_size = (int(base_width * scale), int(base_height * scale))
     
     resized = base_image.resize(new_size, Image.Resampling.LANCZOS)
@@ -77,8 +78,8 @@ def render_scaled_image(base_image:Image.Image, target_width:int,
     letterboxing_color = resized.getpixel((0, 0))
     canvas = Image.new('RGBA', (target_width, target_height), letterboxing_color)
 
-    offset_x = (target_width - new_size[0]) // 2
-    offset_y = (target_height - new_size[1]) // 2
+    offset_x = (target_width - new_size[0]) // 2 + panning[0]
+    offset_y = (target_height - new_size[1]) // 2 + panning[1]
 
     canvas.paste(resized, (offset_x, offset_y))
 
