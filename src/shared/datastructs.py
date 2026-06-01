@@ -80,6 +80,7 @@ def deserialize_client(client_data:dict) -> Client:
     return Client(
         alias=client_data.get('alias'), color=client_data.get('color'),
         last_coordinate_utc_ts=client_data.get('last_coordinate_utc_ts'),
+        pin_position=client_data.get('pin_position'),
         je=jurassic_echoes,
     )
 

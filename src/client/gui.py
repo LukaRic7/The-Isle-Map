@@ -17,7 +17,7 @@ else:
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from shared.datastructs import Client, JurassicEchoes, deserialize_client
+from shared.datastructs import Client, JurassicEchoes, Coord, deserialize_client
 from shared.je_fetching import Observer, get_sleep_time
 from client.rendering import render_scaled_image
 from shared.utils import get_exe_path
@@ -362,12 +362,32 @@ class Gui(ttk.Frame):
                 ]
                 for client_data in self.client_list.values()
             }
+        else:
+            client_map = {
+                client_data.color: client_id
+                for client_id, client_data in self.client_list.items()
+            }
+
+            for color, coords in coordinate_map.items():
+                if client_map.get(color):
+                    self.client_list[client_map[color]].coordinates = [Coord(
+                        utc_timestamp=0, coordinates=(coord[0], coord[1])
+                    ) for coord in coords]
         
         if not pin_map:
             pin_map = {
                 client_data.color: client_data.pin_position
                 for client_data in self.client_list.values()
             }
+        else:
+            client_map = {
+                client_data.color: client_id
+                for client_id, client_data in self.client_list.items()
+            }
+
+            for color, pin in pin_map.items():
+                if client_map.get(color):
+                    self.client_list[client_map[color]].pin_position = pin
 
         rendered = render_scaled_image(
             self.__base_image, width, height, coordinate_map, self.__zoom,
