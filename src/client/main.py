@@ -243,7 +243,7 @@ def main():
     global app
 
     root = tk.Tk()
-    root.wm_title('The Isle Map v5.0')
+    root.wm_title('The Isle Map v5.2')
     root.wm_resizable(True, True)
     root.protocol('WM_DELETE_WINDOW', lambda: on_close(root))
     root.wm_minsize(640, 360)
