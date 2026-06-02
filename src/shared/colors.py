@@ -40,12 +40,12 @@ class ColorManager:
     available again.
     """
     _available_colors = [
-        "#F6C945",  # Gold
-        "#F0672E",  # Orange
-        "#A75DF0",  # Purple
-        "#FF7ACD",  # Pink
-        "#48C9FA",  # Cyan
-        "#E63946",  # Red
+        "#0072B2",  # Blue
+        "#E69F00",  # Amber
+        "#009E73",  # Teal Green
+        "#CC79A7",  # Magenta
+        "#D55E00",  # Vermillion
+        "#56B4E9",  # Sky Blue
     ]
 
     # Currently occupied colors
