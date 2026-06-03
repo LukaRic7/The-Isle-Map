@@ -47,7 +47,6 @@ class Gui(ttk.Frame):
         self.__render_job:str = None
         self.__tk_image:ImageTk.PhotoImage = None
         self.__canvas_image_id:int = None # GC Prevention
-        self.__next_update_ts:int = get_sleep_time() + int(time.time())
 
         self.__base_image = Image.open(get_exe_path('client/maps/{}'.format(
             self.__config.get('map', {}).get('filename')
@@ -65,6 +64,8 @@ class Gui(ttk.Frame):
 
         je:dict = self.__config.get('jurassic_echoes', {})
         self.__sleep_delay:int = je.get('fetching_delay_sec', 3)
+        self.__next_update_ts:int = (get_sleep_time(self.__sleep_delay)
+                                     + int(time.time()))
 
         self.__add_widgets()
         self.update_player_list(disconnected=True)
