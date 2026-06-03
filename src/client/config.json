@@ -6,6 +6,7 @@
     },
     "jurassic_echoes": {
         "cookie": "",
-        "user_agent": ""
+        "user_agent": "",
+        "fetching_delay_sec": 10
     }
 }
