@@ -109,8 +109,10 @@ def fetching_worker():
     """
     global stop_threads
 
+    je:dict = CONFIG.get('jurassic_echoes', {})
+    delay:int = je.get('fetching_delay_sec', 3)
     while not stop_threads:
-        time.sleep(get_sleep_time())
+        time.sleep(get_sleep_time(delay))
 
         if sio.connected: continue
 
@@ -243,7 +245,7 @@ def main():
     global app
 
     root = tk.Tk()
-    root.wm_title('The Isle Map v5.2')
+    root.wm_title('The Isle Map v5.3')
     root.wm_resizable(True, True)
     root.protocol('WM_DELETE_WINDOW', lambda: on_close(root))
     root.wm_minsize(640, 360)

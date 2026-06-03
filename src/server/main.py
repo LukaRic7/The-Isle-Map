@@ -340,7 +340,8 @@ async def fetching_worker():
         }
         await sio.emit('update-player-list', data)
 
-        await asyncio.sleep(get_sleep_time())
+        je:dict = CONFIG.get('jurassic_echoes', {})
+        await asyncio.sleep(get_sleep_time(je.get('fetching_delay_sec', 3)))
 
 async def heartbeat_worker():
     """

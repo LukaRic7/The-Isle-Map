@@ -1,4 +1,7 @@
 {
     "password": "pass",
-    "port": 56556
+    "port": 56556,
+    "jurassic_echoes": {
+        "fetching_delay_sec": 10
+    }
 }

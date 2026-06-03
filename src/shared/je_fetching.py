@@ -1,8 +1,8 @@
 from datetime import datetime
 from collections import deque
 from bs4 import BeautifulSoup
-import loggerric as lr
 import requests, time
+import loggerric as lr
 
 def get_sleep_time(delay:int=3) -> int:
     """

@@ -63,6 +63,9 @@ class Gui(ttk.Frame):
         self.client_list:dict[str, Client] = {}
         self.__client_widget_list:dict[str, dict[str, ttk.Widget]] = {}
 
+        je:dict = self.__config.get('jurassic_echoes', {})
+        self.__sleep_delay:int = je.get('fetching_delay_sec', 3)
+
         self.__add_widgets()
         self.update_player_list(disconnected=True)
 
@@ -75,7 +78,7 @@ class Gui(ttk.Frame):
         """
         now_ts = int(time.time())
         if self.__next_update_ts - now_ts <= 0:
-            self.__next_update_ts = get_sleep_time() + now_ts
+            self.__next_update_ts = get_sleep_time(self.__sleep_delay) + now_ts
 
         self.set_status_text(f'Updating in {self.__next_update_ts - now_ts}s')
 
