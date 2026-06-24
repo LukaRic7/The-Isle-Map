@@ -5,7 +5,7 @@
 ---
 
 ### The Isle Map UI
-![The Isle Map GUI](screenshots/GUI.png)
+![The Isle Map GUI](screenshots/NewGUI.png)
 
 ---
 
